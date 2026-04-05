@@ -1,0 +1,217 @@
+
+------------------------------
+Test results for 1.2
+------------------------------
+Losses:
+0.2545855596091113
+0.09103278315731667
+0.05999790564732541
+0.04374969222903167
+0.03265594839807458
+0.026053732033106285
+0.024467997834377555
+0.022758157856204168
+0.020107263416925866
+0.01946933481352488
+AUC values:
+0.9993586279761905
+0.9994803238378683
+0.9992883447845806
+0.9995506968537414
+0.9991890372165534
+0.9992953167942178
+0.9993478524234692
+0.9996015071995465
+0.9993736608985261
+0.9994689878684808
+
+------------------------------
+Test results for 1.2
+------------------------------
+Accuracy: 0.9822222222222222
+F1 Score: 0.9821044841079626
+Macro ROC-AUC: 0.9991916723922903
+----------------------------
+Ablation for task 1.2
+---------------------
+Training with gamma: 1Running epoch: 1  Evaluations for the epochEpoch 1 done, Val AUC: 0.9994Time taken: 128.84sRunning epoch: 2  Evaluations for the epochEpoch 2 done, Val AUC: 0.9991Time taken: 121.32sRunning epoch: 3  Evaluations for the epochEpoch 3 done, Val AUC: 0.9997Time taken: 121.72sTraining with gamma: 2Running epoch: 1  Evaluations for the epochEpoch 1 done, Val AUC: 0.9989Time taken: 122.48sRunning epoch: 2  Evaluations for the epochEpoch 2 done, Val AUC: 0.9995Time taken: 122.84sRunning epoch: 3  Evaluations for the epochEpoch 3 done, Val AUC: 0.9995Time taken: 122.82sTraining with gamma: 3Running epoch: 1  Evaluations for the epochEpoch 1 done, Val AUC: 0.9993Time taken: 122.84sRunning epoch: 2  Evaluations for the epochEpoch 2 done, Val AUC: 0.9996Time taken: 123.09sRunning epoch: 3  Evaluations for the epochEpoch 3 done, Val AUC: 0.9994Time taken: 122.63s
+------------------------------
+Test results for 1.2
+------------------------------
+Values of ROC-AUC across changing gamma:
+0.9996726395691612
+0.9995346823129252
+0.9995783856859412
+----------------------------
+Training for task 2.1
+---------------------
+----------------------------
+Training for task 2.1
+---------------------
+Running epoch: 1  Evaluating...Epoch 1 done, Val AUC: 0.9992Time taken: 257.12sRunning epoch: 2  Evaluating...Epoch 2 done, Val AUC: 0.9994Time taken: 259.21sRunning epoch: 3  Evaluating...Epoch 3 done, Val AUC: 0.9993Time taken: 254.07sRunning epoch: 4  Evaluating...Epoch 4 done, Val AUC: 0.9993Time taken: 331.82sRunning epoch: 5  Evaluating...Epoch 5 done, Val AUC: 0.9995Time taken: 456.54sRunning epoch: 6  Evaluating...Epoch 6 done, Val AUC: 0.9998Time taken: 428.19sRunning epoch: 7  Evaluating...Epoch 7 done, Val AUC: 0.9995Time taken: 424.19sRunning epoch: 8  Evaluating...Epoch 8 done, Val AUC: 0.9994Time taken: 427.76sRunning epoch: 9  Evaluating...Epoch 9 done, Val AUC: 0.9997Time taken: 440.05sRunning epoch: 10  Evaluating...Epoch 10 done, Val AUC: 0.9996Time taken: 443.33s
+------------------------------
+Train results for 2.1
+------------------------------
+Losses:
+0.17555784358282128
+0.06734371896096081
+0.03911979325707016
+0.033055597593173246
+0.03430016894814265
+0.019577040522366057
+0.027975137770988624
+0.028680701032508433
+0.01894576148445759
+0.025443040873483945
+AUC values:
+0.9991870606575963
+0.9993690281746032
+0.999324294756236
+0.9992620107426304
+0.9995196162698413
+0.9997719992630385
+0.9994770950680272
+0.9993632378117914
+0.9997258101190477
+0.9995899419217688
+----------------------------
+Training for task 2.2
+---------------------
+Running epoch: 1
+  Evaluating...
+Epoch 1 done, Val AUC: 0.9753
+Time taken: 491.34s
+Running epoch: 2
+  Evaluating...
+Epoch 2 done, Val AUC: 0.9917
+Time taken: 460.63s
+Running epoch: 3
+  Evaluating...
+Epoch 3 done, Val AUC: 0.9950
+Time taken: 443.83s
+Running epoch: 4
+  Evaluating...
+Epoch 4 done, Val AUC: 0.9940
+Time taken: 442.06s
+Running epoch: 5
+  Evaluating...
+Epoch 5 done, Val AUC: 0.9946
+Time taken: 446.58s
+Running epoch: 6
+  Evaluating...
+Epoch 6 done, Val AUC: 0.9955
+Time taken: 450.27s
+Running epoch: 7
+  Evaluating...
+Epoch 7 done, Val AUC: 0.9970
+Time taken: 282.01s
+Running epoch: 8
+  Evaluating...
+Epoch 8 done, Val AUC: 0.9970
+Time taken: 258.23s
+Running epoch: 9
+  Evaluating...
+Epoch 9 done, Val AUC: 0.9975
+Time taken: 258.79s
+Running epoch: 10
+  Evaluating...
+Epoch 10 done, Val AUC: 0.9973
+Time taken: 258.98s
+
+------------------------------
+Train results for 2.2
+------------------------------
+Losses:
+0.9709247674433713
+0.4562965440492945
+0.33392541293313255
+0.25725514362306157
+0.21239141596704975
+0.1856412640701847
+0.16678042742447352
+0.1414043287480291
+0.12837971123754852
+0.12797569812318016
+AUC values:
+0.9753249259070295
+0.9917359304138322
+0.9950487076530612
+0.9940075033730158
+0.9946273465702948
+0.9954604285430838
+0.9970165496315193
+0.9969892668934239
+0.9974679633219953
+0.997258851643991
+
+------------------------------
+Test results for 2.1
+------------------------------
+Accuracy: 0.9803703703703703
+F1 Score: 0.979715545094394
+Macro ROC-AUC: 0.9995059264172335
+
+------------------------------
+Test results for 2.2
+------------------------------
+Accuracy: 0.9433333333333334
+F1 Score: 0.9420391935506952
+Macro ROC-AUC: 0.9975589294784581
+----------------------------
+Ablation for task 2.1
+---------------------
+Training with gamma: 1
+Training with gamma: 1
+Running epoch: 1
+  Evaluations for the epoch
+Epoch 1 done, Val AUC: 0.9993
+Time taken: 256.01s
+Running epoch: 2
+  Evaluations for the epoch
+Epoch 2 done, Val AUC: 0.9993
+Time taken: 253.23s
+Running epoch: 3
+  Evaluations for the epoch
+Epoch 3 done, Val AUC: 0.9996
+Time taken: 252.59s
+Training with gamma: 2
+Running epoch: 1
+  Evaluations for the epoch
+Epoch 1 done, Val AUC: 0.9994
+Time taken: 254.09s
+Running epoch: 2
+  Evaluations for the epoch
+Epoch 2 done, Val AUC: 0.9994
+Time taken: 265.05s
+Running epoch: 3
+  Evaluations for the epoch
+Epoch 3 done, Val AUC: 0.9994
+Time taken: 275.62s
+Training with gamma: 3
+Running epoch: 1
+  Evaluations for the epoch
+Epoch 1 done, Val AUC: 0.9995
+Time taken: 262.46s
+Running epoch: 2
+  Evaluations for the epoch
+Epoch 2 done, Val AUC: 0.9995
+Time taken: 260.85s
+Running epoch: 3
+  Evaluations for the epoch
+Epoch 3 done, Val AUC: 0.9995
+Time taken: 253.05s
+
+------------------------------
+Test results for 2.1
+------------------------------
+Values of ROC-AUC across changing gamma:
+0.9995674469387754
+0.9994323773809523
+0.9995133549603172
+
+------------------------------
+Ablation Test results for 2.1
+------------------------------
+Accuracy: 0.9722222222222222
+F1 Score: 0.9723357085413307
+Macro ROC-AUC: 0.999562099319728

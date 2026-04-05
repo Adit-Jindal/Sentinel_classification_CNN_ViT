@@ -46,7 +46,7 @@ class CropData(Dataset):
 
 
 #Example usage
-def load_data(csv="train.csv"):
+def get_dataloader(csv="train.csv"):
     img_dir = './A3_Dataset'
     csv_path = os.path.join(img_dir,csv)
 
@@ -66,6 +66,11 @@ def load_data(csv="train.csv"):
         shuffle=shuffle,
         num_workers=4
     )
+
+    return dataloader
+
+def load_data(csv="train.csv"): 
+    dataloader = get_dataloader(csv)
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 

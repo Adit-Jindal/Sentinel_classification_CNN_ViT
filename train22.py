@@ -1,237 +1,242 @@
-#!/usr/bin/env python
-# coding: utf-8
+    #!/usr/bin/env python
+    # coding: utf-8
 
-# -----------------------------
-# Run Management
-# -----------------------------
-import os
-import json
-from datetime import datetime
+def main():
+    # -----------------------------
+    # Run Management
+    # -----------------------------
+    import os
+    import json
+    from datetime import datetime
 
-def create_run_dir(base="runs/task2_2"):
-    os.makedirs(base, exist_ok=True)
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(base, f"run_{run_id}")
-    os.makedirs(run_dir)
-    os.makedirs(os.path.join(run_dir, "plots"))
-    return run_dir
+    def create_run_dir(base="runs/task2_2"):
+        os.makedirs(base, exist_ok=True)
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(base, f"run_{run_id}")
+        os.makedirs(run_dir)
+        os.makedirs(os.path.join(run_dir, "plots"))
+        return run_dir
 
-run_dir = create_run_dir()
-print("Saving outputs to:", run_dir)
-
-
-# -----------------------------
-# Load Data
-# -----------------------------
-from utils import load_data
-
-train_path = "train.csv"
-val_path = "validation.csv"
-
-train_data = load_data(train_path)
-val_data = load_data(val_path)
+    run_dir = create_run_dir()
+    print("Saving outputs to:", run_dir)
 
 
-# -----------------------------
-# DyT (No normalization, as requested)
-# -----------------------------
-import torch.nn as nn
-import torch
+    # -----------------------------
+    # Load Data
+    # -----------------------------
+    from utils import load_data
 
-class DyT(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.alpha = nn.Parameter(torch.ones(1))
+    train_path = "train.csv"
+    val_path = "validation.csv"
 
-    def forward(self, x):
-        return torch.tanh(self.alpha * x)
+    train_data = load_data(train_path)
+    val_data = load_data(val_path)
 
 
-def replace_layernorm(module):
-    for name, child in module.named_children():
-        if isinstance(child, nn.LayerNorm):
-            setattr(module, name, DyT())
-        else:
-            replace_layernorm(child)
+    # -----------------------------
+    # DyT (No normalization, as requested)
+    # -----------------------------
+    import torch.nn as nn
+    import torch
+
+    class DyT(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.alpha = nn.Parameter(torch.ones(1))
+
+        def forward(self, x):
+            return torch.tanh(self.alpha * x)
 
 
-# -----------------------------
-# Model (DeiT-3 + DyT)
-# -----------------------------
-import timm
-
-model = timm.create_model('deit3_small_patch16_224', pretrained=True)
-replace_layernorm(model)
-
-# Replace classification head
-model.head = nn.Linear(model.head.in_features, 10)
+    def replace_layernorm(module):
+        for name, child in module.named_children():
+            if isinstance(child, nn.LayerNorm):
+                setattr(module, name, DyT())
+            else:
+                replace_layernorm(child)
 
 
-# -----------------------------
-# Training Setup
-# -----------------------------
-import torch.optim as optim
-import params
+    # -----------------------------
+    # Model (DeiT-3 + DyT)
+    # -----------------------------
+    import timm
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model = model.to(device)
+    model = timm.create_model('deit3_small_patch16_224', pretrained=True)
+    replace_layernorm(model)
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=params.lr)
-
-
-# -----------------------------
-# Save Config
-# -----------------------------
-from params import num_epochs
-
-config = {
-    "model": "deit3_small + DyT (no LayerNorm)",
-    "lr": params.lr,
-    "epochs": num_epochs,
-    "batch_size": 32
-}
-
-with open(os.path.join(run_dir, "config.json"), "w") as f:
-    json.dump(config, f, indent=4)
+    # Replace classification head
+    model.head = nn.Linear(model.head.in_features, 10)
 
 
-# -----------------------------
-# Training Loop
-# -----------------------------
-from sklearn.metrics import roc_auc_score
-import numpy as np
-from sklearn.preprocessing import label_binarize
-import time
+    # -----------------------------
+    # Training Setup
+    # -----------------------------
+    import torch.optim as optim
+    import params
 
-best_auc = 0
-best_model_state = None
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model = model.to(device)
 
-metrics = {
-    "epoch": [],
-    "train_loss": [],
-    "val_auc": [],
-    "val_acc": [],
-    "val_f1": []
-}
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
-for epoch in range(num_epochs):
-    start = time.time()
-    model.train()
-    train_loss = 0
 
-    print(f"Running epoch: {epoch+1}")
+    # -----------------------------
+    # Save Config
+    # -----------------------------
+    from params import num_epochs
 
-    # ---- Training ----
-    for images, labels in train_data:
-        images, labels = images.to(device), labels.to(device)
+    config = {
+        "model": "deit3_small + DyT (no LayerNorm)",
+        "lr": params.lr,
+        "epochs": num_epochs,
+        "batch_size": 32
+    }
 
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+    with open(os.path.join(run_dir, "config.json"), "w") as f:
+        json.dump(config, f, indent=4)
 
-        train_loss += loss.item()
 
-    train_loss /= len(train_data)
+    # -----------------------------
+    # Training Loop
+    # -----------------------------
+    from sklearn.metrics import roc_auc_score
+    import numpy as np
+    from sklearn.preprocessing import label_binarize
+    import time
 
-    # ---- Validation ----
-    model.eval()
-    all_labels = []
-    all_probs = []
+    best_auc = 0
+    best_model_state = None
 
-    print("  Evaluating...")
+    metrics = {
+        "epoch": [],
+        "train_loss": [],
+        "val_auc": [],
+        "val_acc": [],
+        "val_f1": []
+    }
 
-    with torch.no_grad():
-        for images, labels in val_data:
-            images = images.to(device)
+    for epoch in range(num_epochs):
+        start = time.time()
+        model.train()
+        train_loss = 0
 
+        print(f"Running epoch: {epoch+1}")
+
+        # ---- Training ----
+        for images, labels in train_data:
+            images, labels = images.to(device), labels.to(device)
+
+            optimizer.zero_grad()
             outputs = model(images)
-            probs = torch.softmax(outputs, dim=1)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-            all_probs.append(probs.cpu().numpy())
-            all_labels.append(labels.numpy())
+            train_loss += loss.item()
 
-    all_probs = np.concatenate(all_probs)
-    all_labels = np.concatenate(all_labels)
+        train_loss /= len(train_data)
 
-    y_true = label_binarize(all_labels, classes=list(range(10)))
+        # ---- Validation ----
+        model.eval()
+        all_labels = []
+        all_probs = []
 
-    auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
+        print("  Evaluating...")
 
-    # Extra metrics (same as 2.1)
-    from sklearn.metrics import accuracy_score, f1_score
-    preds = np.argmax(all_probs, axis=1)
-    acc = accuracy_score(all_labels, preds)
-    f1 = f1_score(all_labels, preds, average='macro')
+        with torch.no_grad():
+            for images, labels in val_data:
+                images = images.to(device)
 
-    # Store
-    metrics["epoch"].append(epoch+1)
-    metrics["train_loss"].append(train_loss)
-    metrics["val_auc"].append(auc)
-    metrics["val_acc"].append(acc)
-    metrics["val_f1"].append(f1)
+                outputs = model(images)
+                probs = torch.softmax(outputs, dim=1)
 
-    print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
-    print(f"Time taken: {time.time() - start:.2f}s")
+                all_probs.append(probs.cpu().numpy())
+                all_labels.append(labels.numpy())
 
-    # ---- Save best model ----
-    if auc > best_auc:
-        best_auc = auc
-        best_model_state = model.state_dict()
+        all_probs = np.concatenate(all_probs)
+        all_labels = np.concatenate(all_labels)
 
+        y_true = label_binarize(all_labels, classes=list(range(10)))
 
-# -----------------------------
-# Save Model
-# -----------------------------
-torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
+        auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-print("Training complete. Best AUC:", best_auc)
+        # Extra metrics (same as 2.1)
+        from sklearn.metrics import accuracy_score, f1_score
+        preds = np.argmax(all_probs, axis=1)
+        acc = accuracy_score(all_labels, preds)
+        f1 = f1_score(all_labels, preds, average='macro')
 
+        # Store
+        metrics["epoch"].append(epoch+1)
+        metrics["train_loss"].append(train_loss)
+        metrics["val_auc"].append(auc)
+        metrics["val_acc"].append(acc)
+        metrics["val_f1"].append(f1)
 
-# -----------------------------
-# Save Metrics
-# -----------------------------
-import pandas as pd
+        print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
+        print(f"Time taken: {time.time() - start:.2f}s")
 
-df = pd.DataFrame(metrics)
-df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
-
-
-# -----------------------------
-# Plotting
-# -----------------------------
-import matplotlib.pyplot as plt
-
-# Loss
-plt.figure()
-plt.plot(metrics["epoch"], metrics["train_loss"], marker='o')
-plt.xlabel("Epochs")
-plt.ylabel("Loss")
-plt.title("Training Loss (DeiT + DyT)")
-plt.savefig(os.path.join(run_dir, "plots/loss.png"))
-plt.close()
-
-# AUC
-plt.figure()
-plt.plot(metrics["epoch"], metrics["val_auc"], marker='s')
-plt.xlabel("Epochs")
-plt.ylabel("AUC")
-plt.title("Validation AUC (DeiT + DyT)")
-plt.savefig(os.path.join(run_dir, "plots/auc.png"))
-plt.close()
-
-# Accuracy & F1
-plt.figure()
-plt.plot(metrics["epoch"], metrics["val_acc"], label="Accuracy")
-plt.plot(metrics["epoch"], metrics["val_f1"], label="F1")
-plt.xlabel("Epochs")
-plt.ylabel("Score")
-plt.legend()
-plt.title("Validation Metrics (DeiT + DyT)")
-plt.savefig(os.path.join(run_dir, "plots/f1_acc.png"))
-plt.close()
+        # ---- Save best model ----
+        if auc > best_auc:
+            best_auc = auc
+            best_model_state = model.state_dict()
 
 
-print("All outputs saved to:", run_dir)
+    # -----------------------------
+    # Save Model
+    # -----------------------------
+    torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
+
+    print("Training complete. Best AUC:", best_auc)
+
+
+    # -----------------------------
+    # Save Metrics
+    # -----------------------------
+    import pandas as pd
+
+    df = pd.DataFrame(metrics)
+    df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
+
+
+    # -----------------------------
+    # Plotting
+    # -----------------------------
+    import matplotlib.pyplot as plt
+
+    # Loss
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["train_loss"], marker='o')
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Training Loss (DeiT + DyT)")
+    plt.savefig(os.path.join(run_dir, "plots/loss.png"))
+    plt.close()
+
+    # AUC
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["val_auc"], marker='s')
+    plt.xlabel("Epochs")
+    plt.ylabel("AUC")
+    plt.title("Validation AUC (DeiT + DyT)")
+    plt.savefig(os.path.join(run_dir, "plots/auc.png"))
+    plt.close()
+
+    # Accuracy & F1
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["val_acc"], label="Accuracy")
+    plt.plot(metrics["epoch"], metrics["val_f1"], label="F1")
+    plt.xlabel("Epochs")
+    plt.ylabel("Score")
+    plt.legend()
+    plt.title("Validation Metrics (DeiT + DyT)")
+    plt.savefig(os.path.join(run_dir, "plots/f1_acc.png"))
+    plt.close()
+
+
+    print("All outputs saved to:", run_dir)
+
+
+if __name__=="__main__":
+    main()

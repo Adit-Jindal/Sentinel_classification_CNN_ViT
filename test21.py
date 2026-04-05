@@ -1,122 +1,127 @@
-#!/usr/bin/env python
-# coding: utf-8
+    #!/usr/bin/env python
+    # coding: utf-8
 
-# -----------------------------
-# Run Management
-# -----------------------------
-import os
-import json
-from datetime import datetime
+def main():
+    # -----------------------------
+    # Run Management
+    # -----------------------------
+    import os
+    import json
+    from datetime import datetime
 
-def create_run_dir(base="runs/task2_1_test"):
-    os.makedirs(base, exist_ok=True)
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(base, f"run_{run_id}")
-    os.makedirs(run_dir)
-    return run_dir
+    def create_run_dir(base="runs/task2_1_test"):
+        os.makedirs(base, exist_ok=True)
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(base, f"run_{run_id}")
+        os.makedirs(run_dir)
+        return run_dir
 
-run_dir = create_run_dir()
-print("Saving outputs to:", run_dir)
-
-
-# -----------------------------
-# Load Data
-# -----------------------------
-from utils import load_data
-
-test_path = "test.csv"
-test_data = load_data(test_path)
+    run_dir = create_run_dir()
+    print("Saving outputs to:", run_dir)
 
 
-# -----------------------------
-# Model (DeiT-3 Small)
-# -----------------------------
-import torch
-import torch.nn as nn
-import timm
+    # -----------------------------
+    # Load Data
+    # -----------------------------
+    from utils import load_data
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-
-model = timm.create_model('deit3_small_patch16_224', pretrained=False)
-model.head = nn.Linear(model.head.in_features, 10)
-
-# Load trained weights
-state_dict = torch.load("best_model21.pth", map_location=device)
-model.load_state_dict(state_dict)
-
-model = model.to(device)
-model.eval()
+    test_path = "test.csv"
+    test_data = load_data(test_path)
 
 
-# -----------------------------
-# Inference
-# -----------------------------
-from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
-from sklearn.preprocessing import label_binarize
-import numpy as np
+    # -----------------------------
+    # Model (DeiT-3 Small)
+    # -----------------------------
+    import torch
+    import torch.nn as nn
+    import timm
 
-all_labels = []
-all_probs = []
-all_preds = []
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-with torch.no_grad():
-    for images, labels in test_data:
-        images = images.to(device)
+    model = timm.create_model('deit3_small_patch16_224', pretrained=False)
+    model.head = nn.Linear(model.head.in_features, 10)
 
-        outputs = model(images)
-        probs = torch.softmax(outputs, dim=1)
-        preds = torch.argmax(probs, dim=1)
+    # Load trained weights
+    state_dict = torch.load("best_model21.pth", map_location=device)
+    model.load_state_dict(state_dict)
 
-        all_probs.append(probs.cpu().numpy())
-        all_labels.append(labels.numpy())
-        all_preds.append(preds.cpu().numpy())
+    model = model.to(device)
+    model.eval()
 
 
-# -----------------------------
-# Metrics
-# -----------------------------
-all_probs = np.concatenate(all_probs)
-all_labels = np.concatenate(all_labels)
-all_preds = np.concatenate(all_preds)
+    # -----------------------------
+    # Inference
+    # -----------------------------
+    from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
+    from sklearn.preprocessing import label_binarize
+    import numpy as np
 
-# Accuracy
-acc = accuracy_score(all_labels, all_preds)
+    all_labels = []
+    all_probs = []
+    all_preds = []
 
-# Macro F1
-f1 = f1_score(all_labels, all_preds, average='macro')
+    with torch.no_grad():
+        for images, labels in test_data:
+            images = images.to(device)
 
-# Macro AUC
-y_true = label_binarize(all_labels, classes=list(range(10)))
-auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
+            outputs = model(images)
+            probs = torch.softmax(outputs, dim=1)
+            preds = torch.argmax(probs, dim=1)
 
-
-# -----------------------------
-# Print Results
-# -----------------------------
-print("\n===== Test Results (DeiT) =====")
-print(f"Accuracy  : {acc:.4f}")
-print(f"Macro F1  : {f1:.4f}")
-print(f"Macro AUC : {auc:.4f}")
+            all_probs.append(probs.cpu().numpy())
+            all_labels.append(labels.numpy())
+            all_preds.append(preds.cpu().numpy())
 
 
-# -----------------------------
-# Save Results
-# -----------------------------
-results = {
-    "accuracy": acc,
-    "f1_score": f1,
-    "macro_roc_auc": auc
-}
+    # -----------------------------
+    # Metrics
+    # -----------------------------
+    all_probs = np.concatenate(all_probs)
+    all_labels = np.concatenate(all_labels)
+    all_preds = np.concatenate(all_preds)
 
-with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
-    json.dump(results, f, indent=4)
+    # Accuracy
+    acc = accuracy_score(all_labels, all_preds)
 
+    # Macro F1
+    f1 = f1_score(all_labels, all_preds, average='macro')
 
-# Optional CSV
-import pandas as pd
-
-df = pd.DataFrame([results])
-df.to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
+    # Macro AUC
+    y_true = label_binarize(all_labels, classes=list(range(10)))
+    auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
 
-print("Test results saved to:", run_dir)
+    # -----------------------------
+    # Print Results
+    # -----------------------------
+    print("\n===== Test Results (DeiT) =====")
+    print(f"Accuracy  : {acc:.4f}")
+    print(f"Macro F1  : {f1:.4f}")
+    print(f"Macro AUC : {auc:.4f}")
+
+
+    # -----------------------------
+    # Save Results
+    # -----------------------------
+    results = {
+        "accuracy": acc,
+        "f1_score": f1,
+        "macro_roc_auc": auc
+    }
+
+    with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
+        json.dump(results, f, indent=4)
+
+
+    # Optional CSV
+    import pandas as pd
+
+    df = pd.DataFrame([results])
+    df.to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
+
+
+    print("Test results saved to:", run_dir)
+
+
+if __name__=="__main__":
+    main()

@@ -1,235 +1,239 @@
-#!/usr/bin/env python
-# coding: utf-8
+    #!/usr/bin/env python
+    # coding: utf-8
 
-# -----------------------------
-# Run Management
-# -----------------------------
-import os
-import json
-from datetime import datetime
+def main():
+    # -----------------------------
+    # Run Management
+    # -----------------------------
+    import os
+    import json
+    from datetime import datetime
 
-def create_run_dir(base="runs/task1_1"):
-    os.makedirs(base, exist_ok=True)
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(base, f"run_{run_id}")
-    os.makedirs(run_dir)
-    os.makedirs(os.path.join(run_dir, "plots"))
-    return run_dir
+    def create_run_dir(base="runs/task1_1"):
+        os.makedirs(base, exist_ok=True)
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(base, f"run_{run_id}")
+        os.makedirs(run_dir)
+        os.makedirs(os.path.join(run_dir, "plots"))
+        return run_dir
 
-run_dir = create_run_dir()
-print("Saving outputs to:", run_dir)
-
-
-# -----------------------------
-# Load Data
-# -----------------------------
-from utils import load_data
-
-train_path = "train.csv"
-val_path = "validation.csv"
-
-train_data = load_data(train_path)
-val_data = load_data(val_path)
+    run_dir = create_run_dir()
+    print("Saving outputs to:", run_dir)
 
 
-# -----------------------------
-# Download pretrained weights
-# -----------------------------
-import urllib.request
-import ssl
-import certifi
+    # -----------------------------
+    # Load Data
+    # -----------------------------
+    from utils import load_data
 
-url = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
-ctx = ssl.create_default_context(cafile=certifi.where())
+    train_path = "train.csv"
+    val_path = "validation.csv"
 
-req = urllib.request.Request(
-    url,
-    headers={"User-Agent": "Mozilla/5.0"}
-)
-
-with urllib.request.urlopen(req, context=ctx) as response:
-    data = response.read()
-    with open("resnet18-f37072fd.pth", "wb") as f:
-        f.write(data)
-
-print("Downloaded weights!")
+    train_data = load_data(train_path)
+    val_data = load_data(val_path)
 
 
-# -----------------------------
-# Model
-# -----------------------------
-import torchvision.models as models
-import torch
+    # -----------------------------
+    # Download pretrained weights
+    # -----------------------------
+    import urllib.request
+    import ssl
+    import certifi
 
-state_dict = torch.load("resnet18-f37072fd.pth")
-model = models.resnet18()
-model.load_state_dict(state_dict)
+    url = "https://download.pytorch.org/models/resnet18-f37072fd.pth"
+    ctx = ssl.create_default_context(cafile=certifi.where())
 
-model.fc = torch.nn.Linear(model.fc.in_features, 10)
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
 
+    with urllib.request.urlopen(req, context=ctx) as response:
+        data = response.read()
+        with open("resnet18-f37072fd.pth", "wb") as f:
+            f.write(data)
 
-# -----------------------------
-# Training Setup
-# -----------------------------
-import torch.optim as optim
-import torch.nn as nn
-import params
-
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model = model.to(device)
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=params.lr)
+    print("Downloaded weights!")
 
 
-# -----------------------------
-# Save Config
-# -----------------------------
-from params import num_epochs
+    # -----------------------------
+    # Model
+    # -----------------------------
+    import torchvision.models as models
+    import torch
 
-config = {
-    "model": "resnet18",
-    "lr": params.lr,
-    "epochs": num_epochs,
-    "batch_size": 32
-}
+    state_dict = torch.load("resnet18-f37072fd.pth")
+    model = models.resnet18()
+    model.load_state_dict(state_dict)
 
-with open(os.path.join(run_dir, "config.json"), "w") as f:
-    json.dump(config, f, indent=4)
+    model.fc = torch.nn.Linear(model.fc.in_features, 10)
 
 
-# -----------------------------
-# Training Loop
-# -----------------------------
-from sklearn.metrics import roc_auc_score
-import numpy as np
-import time
+    # -----------------------------
+    # Training Setup
+    # -----------------------------
+    import torch.optim as optim
+    import torch.nn as nn
+    import params
 
-best_auc = 0
-best_model_state = None
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model = model.to(device)
 
-# Structured metrics
-metrics = {
-    "epoch": [],
-    "train_loss": [],
-    "val_auc": [],
-    "val_acc": [],
-    "val_f1": []
-}
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
-for epoch in range(num_epochs):
-    start = time.time()
-    model.train()
-    train_loss = 0
 
-    print(f"Running epoch: {epoch+1}")
+    # -----------------------------
+    # Save Config
+    # -----------------------------
+    from params import num_epochs
 
-    for images, labels in train_data:
-        images, labels = images.to(device), labels.to(device)
+    config = {
+        "model": "resnet18",
+        "lr": params.lr,
+        "epochs": num_epochs,
+        "batch_size": 32
+    }
 
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+    with open(os.path.join(run_dir, "config.json"), "w") as f:
+        json.dump(config, f, indent=4)
 
-        train_loss += loss.item()
 
-    train_loss /= len(train_data)
+    # -----------------------------
+    # Training Loop
+    # -----------------------------
+    from sklearn.metrics import roc_auc_score
+    import numpy as np
+    import time
 
-    model.eval()
-    all_labels = []
-    all_probs = []
+    best_auc = 0
+    best_model_state = None
 
-    print("  Evaluations for the epoch")
+    # Structured metrics
+    metrics = {
+        "epoch": [],
+        "train_loss": [],
+        "val_auc": [],
+        "val_acc": [],
+        "val_f1": []
+    }
 
-    with torch.no_grad():
-        for images, labels in val_data:
-            images = images.to(device)
+    for epoch in range(num_epochs):
+        start = time.time()
+        model.train()
+        train_loss = 0
+
+        print(f"Running epoch: {epoch+1}")
+
+        for images, labels in train_data:
+            images, labels = images.to(device), labels.to(device)
+
+            optimizer.zero_grad()
             outputs = model(images)
-            probs = torch.softmax(outputs, dim=1)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-            all_probs.append(probs.cpu().numpy())
-            all_labels.append(labels.numpy())
+            train_loss += loss.item()
 
-    all_probs = np.concatenate(all_probs)
-    all_labels = np.concatenate(all_labels)
+        train_loss /= len(train_data)
 
-    from sklearn.preprocessing import label_binarize
-    y_true = label_binarize(all_labels, classes=list(range(10)))
+        model.eval()
+        all_labels = []
+        all_probs = []
 
-    auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
+        print("  Evaluations for the epoch")
 
-    # Additional metrics (no change to logic)
-    from sklearn.metrics import accuracy_score, f1_score
-    preds = np.argmax(all_probs, axis=1)
-    acc = accuracy_score(all_labels, preds)
-    f1 = f1_score(all_labels, preds, average='macro')
+        with torch.no_grad():
+            for images, labels in val_data:
+                images = images.to(device)
+                outputs = model(images)
+                probs = torch.softmax(outputs, dim=1)
 
-    # Store metrics
-    metrics["epoch"].append(epoch+1)
-    metrics["train_loss"].append(train_loss)
-    metrics["val_auc"].append(auc)
-    metrics["val_acc"].append(acc)
-    metrics["val_f1"].append(f1)
+                all_probs.append(probs.cpu().numpy())
+                all_labels.append(labels.numpy())
 
-    print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
-    print(f"Time taken: {time.time()-start:.2f}s")
+        all_probs = np.concatenate(all_probs)
+        all_labels = np.concatenate(all_labels)
 
-    if auc > best_auc:
-        best_auc = auc
-        best_model_state = model.state_dict()
+        from sklearn.preprocessing import label_binarize
+        y_true = label_binarize(all_labels, classes=list(range(10)))
 
+        auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-# -----------------------------
-# Save Model
-# -----------------------------
-torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
+        # Additional metrics (no change to logic)
+        from sklearn.metrics import accuracy_score, f1_score
+        preds = np.argmax(all_probs, axis=1)
+        acc = accuracy_score(all_labels, preds)
+        f1 = f1_score(all_labels, preds, average='macro')
 
+        # Store metrics
+        metrics["epoch"].append(epoch+1)
+        metrics["train_loss"].append(train_loss)
+        metrics["val_auc"].append(auc)
+        metrics["val_acc"].append(acc)
+        metrics["val_f1"].append(f1)
 
-# -----------------------------
-# Save Metrics
-# -----------------------------
-import pandas as pd
+        print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
+        print(f"Time taken: {time.time()-start:.2f}s")
 
-df = pd.DataFrame(metrics)
-df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
-
-
-# -----------------------------
-# Plotting
-# -----------------------------
-import matplotlib.pyplot as plt
-
-# Loss
-plt.figure()
-plt.plot(metrics["epoch"], metrics["train_loss"], marker='o')
-plt.xlabel("Epochs")
-plt.ylabel("Loss")
-plt.title("Training Loss")
-plt.savefig(os.path.join(run_dir, "plots/loss.png"))
-plt.close()
-
-# AUC
-plt.figure()
-plt.plot(metrics["epoch"], metrics["val_auc"], marker='s')
-plt.xlabel("Epochs")
-plt.ylabel("AUC")
-plt.title("Validation AUC")
-plt.savefig(os.path.join(run_dir, "plots/auc.png"))
-plt.close()
-
-# Accuracy & F1
-plt.figure()
-plt.plot(metrics["epoch"], metrics["val_acc"], label="Accuracy")
-plt.plot(metrics["epoch"], metrics["val_f1"], label="F1")
-plt.xlabel("Epochs")
-plt.ylabel("Score")
-plt.legend()
-plt.title("Validation Metrics")
-plt.savefig(os.path.join(run_dir, "plots/f1_acc.png"))
-plt.close()
+        if auc > best_auc:
+            best_auc = auc
+            best_model_state = model.state_dict()
 
 
-print("Training complete. Best AUC:", best_auc)
-print("All outputs saved to:", run_dir)
+    # -----------------------------
+    # Save Model
+    # -----------------------------
+    torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
+
+
+    # -----------------------------
+    # Save Metrics
+    # -----------------------------
+    import pandas as pd
+
+    df = pd.DataFrame(metrics)
+    df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
+
+
+    # -----------------------------
+    # Plotting
+    # -----------------------------
+    import matplotlib.pyplot as plt
+
+    # Loss
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["train_loss"], marker='o')
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Training Loss")
+    plt.savefig(os.path.join(run_dir, "plots/loss.png"))
+    plt.close()
+
+    # AUC
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["val_auc"], marker='s')
+    plt.xlabel("Epochs")
+    plt.ylabel("AUC")
+    plt.title("Validation AUC")
+    plt.savefig(os.path.join(run_dir, "plots/auc.png"))
+    plt.close()
+
+    # Accuracy & F1
+    plt.figure()
+    plt.plot(metrics["epoch"], metrics["val_acc"], label="Accuracy")
+    plt.plot(metrics["epoch"], metrics["val_f1"], label="F1")
+    plt.xlabel("Epochs")
+    plt.ylabel("Score")
+    plt.legend()
+    plt.title("Validation Metrics")
+    plt.savefig(os.path.join(run_dir, "plots/f1_acc.png"))
+    plt.close()
+
+
+    print("Training complete. Best AUC:", best_auc)
+    print("All outputs saved to:", run_dir)
+
+if __name__=="__main__":
+    main()

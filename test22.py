@@ -1,31 +1,46 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# -----------------------------
+# Run Management
+# -----------------------------
+import os
+import json
+from datetime import datetime
+
+def create_run_dir(base="runs/task2_2_test"):
+    os.makedirs(base, exist_ok=True)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(base, f"run_{run_id}")
+    os.makedirs(run_dir)
+    return run_dir
+
+run_dir = create_run_dir()
+print("Saving outputs to:", run_dir)
 
 
+# -----------------------------
+# Load Data
+# -----------------------------
 from utils import load_data
 
 test_path = "test.csv"
 test_data = load_data(test_path)
 
 
-# In[2]:
-
-
+# -----------------------------
+# DyT (unchanged)
+# -----------------------------
 import torch.nn as nn
 import torch 
 
 class DyT(nn.Module):
     def __init__(self):
         super().__init__()
-        self.alpha = nn.Parameter(torch.ones(1))  # learnable
+        self.alpha = nn.Parameter(torch.ones(1))
 
     def forward(self, x):
         return torch.tanh(self.alpha * x)
-
-
-# In[3]:
 
 
 def replace_layernorm(module):
@@ -36,11 +51,9 @@ def replace_layernorm(module):
             replace_layernorm(child)
 
 
-# In[4]:
-
-
-import torch
-import torch.nn as nn
+# -----------------------------
+# Model (DeiT + DyT)
+# -----------------------------
 import timm
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -57,9 +70,9 @@ model = model.to(device)
 model.eval()
 
 
-# In[5]:
-
-
+# -----------------------------
+# Inference
+# -----------------------------
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 from sklearn.preprocessing import label_binarize
 import numpy as np
@@ -81,9 +94,9 @@ with torch.no_grad():
         all_preds.append(preds.cpu().numpy())
 
 
-# In[6]:
-
-
+# -----------------------------
+# Metrics
+# -----------------------------
 all_probs = np.concatenate(all_probs)
 all_labels = np.concatenate(all_labels)
 all_preds = np.concatenate(all_preds)
@@ -99,19 +112,33 @@ y_true = label_binarize(all_labels, classes=list(range(10)))
 auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
 
-# In[7]:
-
-
-print("\n===== Test Results (DeiT) =====")
+# -----------------------------
+# Print Results
+# -----------------------------
+print("\n===== Test Results (DeiT + DyT) =====")
 print(f"Accuracy  : {acc:.4f}")
 print(f"Macro F1  : {f1:.4f}")
 print(f"Macro AUC : {auc:.4f}")
 
-with open("results.txt", "a") as f:
-    f.write("\n------------------------------\n")
-    f.write("Test results for 2.2\n")
-    f.write("------------------------------\n")
-    f.write(f"Accuracy: {acc}\n")
-    f.write(f"F1 Score: {f1}\n")
-    f.write(f"Macro ROC-AUC: {auc}\n")
 
+# -----------------------------
+# Save Results
+# -----------------------------
+results = {
+    "accuracy": acc,
+    "f1_score": f1,
+    "macro_roc_auc": auc
+}
+
+with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
+    json.dump(results, f, indent=4)
+
+
+# Optional CSV
+import pandas as pd
+
+df = pd.DataFrame([results])
+df.to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
+
+
+print("Test results saved to:", run_dir)

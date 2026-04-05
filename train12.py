@@ -1,9 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# -----------------------------
+# Run Management
+# -----------------------------
+import os
+import json
+from datetime import datetime
+
+def create_run_dir(base="runs/task1_2"):
+    os.makedirs(base, exist_ok=True)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(base, f"run_{run_id}")
+    os.makedirs(run_dir)
+    os.makedirs(os.path.join(run_dir, "plots"))
+    return run_dir
+
+run_dir = create_run_dir()
+print("Saving outputs to:", run_dir)
 
 
+# -----------------------------
+# Load Data
+# -----------------------------
 from utils import load_data
 
 train_path = "train.csv"
@@ -13,9 +32,9 @@ train_data = load_data(train_path)
 val_data = load_data(val_path)
 
 
-# In[6]:
-
-
+# -----------------------------
+# SE Block
+# -----------------------------
 import torch.nn as nn
 import torch
 
@@ -27,23 +46,16 @@ class SEBlock(nn.Module):
 
     def forward(self, x):
         b, c, h, w = x.size()
-
-        # Squeeze
-        y = x.mean(dim=(2, 3))  # Global Avg Pool
-
-        # Excitation
+        y = x.mean(dim=(2, 3))
         y = torch.relu(self.fc1(y))
         y = torch.sigmoid(self.fc2(y))
-
         y = y.view(b, c, 1, 1)
-
-        # Scale
         return x * y
 
 
-# In[3]:
-
-
+# -----------------------------
+# Model
+# -----------------------------
 import torchvision.models as models
 
 class ResNet18_SE(nn.Module):
@@ -52,17 +64,14 @@ class ResNet18_SE(nn.Module):
 
         self.backbone = models.resnet18(pretrained=False)
 
-        # load pretrained weights
         state_dict = torch.load("resnet18-f37072fd.pth")
         self.backbone.load_state_dict(state_dict)
 
-        # SE blocks
         self.se1 = SEBlock(64)
         self.se2 = SEBlock(128)
         self.se3 = SEBlock(256)
         self.se4 = SEBlock(512)
 
-        # replace fc
         self.backbone.fc = nn.Linear(self.backbone.fc.in_features, num_classes)
 
     def forward(self, x):
@@ -90,9 +99,9 @@ class ResNet18_SE(nn.Module):
         return x
 
 
-# In[4]:
-
-
+# -----------------------------
+# Download pretrained weights
+# -----------------------------
 import urllib.request
 import ssl
 import certifi
@@ -102,7 +111,7 @@ ctx = ssl.create_default_context(cafile=certifi.where())
 
 req = urllib.request.Request(
     url,
-    headers={"User-Agent": "Mozilla/5.0"}  # pretend to be a browser
+    headers={"User-Agent": "Mozilla/5.0"}
 )
 
 with urllib.request.urlopen(req, context=ctx) as response:
@@ -113,137 +122,168 @@ with urllib.request.urlopen(req, context=ctx) as response:
 print("Downloaded weights!")
 
 
-# In[5]:
-
-
-import torch
+# -----------------------------
+# Training Setup
+# -----------------------------
 import torch.optim as optim
-import torch.nn as nn
 import params
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+
 model = ResNet18_SE(num_classes=10)
 model = model.to(device)
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
 
-# In[ ]:
-
-
-outfile = open("results.txt", 'a')
-outfile.write("----------------------------\n")
-outfile.write("Training for task 1.2\n")
-outfile.write("---------------------\n")
-
-
-# In[ ]:
-
-
-import time
+# -----------------------------
+# Save Config
+# -----------------------------
 from params import num_epochs
+
+config = {
+    "model": "resnet18_se",
+    "lr": params.lr,
+    "epochs": num_epochs,
+    "batch_size": 32
+}
+
+with open(os.path.join(run_dir, "config.json"), "w") as f:
+    json.dump(config, f, indent=4)
+
+
+# -----------------------------
+# Training Loop
+# -----------------------------
+import time
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
 best_auc = 0
 best_model_state = None
-losses = []
-auc_vals = []
+
+metrics = {
+    "epoch": [],
+    "train_loss": [],
+    "val_auc": [],
+    "val_acc": [],
+    "val_f1": []
+}
 
 for epoch in range(num_epochs):
-  start = time.time()
-  model.train()
-  train_loss = 0
+    start = time.time()
+    model.train()
+    train_loss = 0
 
-  outfile.write(f"Running epoch: {epoch+1}")
+    print(f"Running epoch: {epoch+1}")
 
-  for images, labels in train_data:
-    images, labels = images.to(device), labels.to(device)
+    for images, labels in train_data:
+        images, labels = images.to(device), labels.to(device)
 
-    optimizer.zero_grad()
-    outputs = model(images)
-    loss = criterion(outputs, labels)
-    loss.backward()
-    optimizer.step()
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
 
-    train_loss += loss.item()
+        train_loss += loss.item()
 
-  train_loss /= len(train_data)
+    train_loss /= len(train_data)
 
-  model.eval()
-  all_labels = []
-  all_probs = []
+    model.eval()
+    all_labels = []
+    all_probs = []
 
-  outfile.write(f"  Evaluations for the epoch")
+    print("  Evaluations for the epoch")
 
-  with torch.no_grad():
-    for images, labels in val_data:
-      images = images.to(device)
-      outputs = model(images)
-      probs = torch.softmax(outputs, dim=1)
+    with torch.no_grad():
+        for images, labels in val_data:
+            images = images.to(device)
+            outputs = model(images)
+            probs = torch.softmax(outputs, dim=1)
 
-      all_probs.append(probs.cpu().numpy())
-      all_labels.append(labels.numpy())
+            all_probs.append(probs.cpu().numpy())
+            all_labels.append(labels.numpy())
 
-  all_probs = np.concatenate(all_probs)
-  all_labels = np.concatenate(all_labels)
+    all_probs = np.concatenate(all_probs)
+    all_labels = np.concatenate(all_labels)
 
-  from sklearn.preprocessing import label_binarize
-  y_true = label_binarize(all_labels, classes=list(range(10)))
+    from sklearn.preprocessing import label_binarize
+    y_true = label_binarize(all_labels, classes=list(range(10)))
 
-  auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
-  losses.append(train_loss)
-  auc_vals.append(auc)
+    auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-  outfile.write(f"Epoch {epoch+1} done, Val AUC: {auc:.4f}")
-  outfile.write(f"Time taken: {time.time()-start:.2f}s")
+    # Extra metrics
+    from sklearn.metrics import accuracy_score, f1_score
+    preds = np.argmax(all_probs, axis=1)
+    acc = accuracy_score(all_labels, preds)
+    f1 = f1_score(all_labels, preds, average='macro')
 
-  if auc > best_auc:
-    best_auc = auc
-    best_model_state = model.state_dict()
+    # Store
+    metrics["epoch"].append(epoch+1)
+    metrics["train_loss"].append(train_loss)
+    metrics["val_auc"].append(auc)
+    metrics["val_acc"].append(acc)
+    metrics["val_f1"].append(f1)
+
+    print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
+    print(f"Time taken: {time.time()-start:.2f}s")
+
+    if auc > best_auc:
+        best_auc = auc
+        best_model_state = model.state_dict()
 
 
-# In[ ]:
+# -----------------------------
+# Save Model
+# -----------------------------
+torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
 
 
-outfile.close()
+# -----------------------------
+# Save Metrics
+# -----------------------------
+import pandas as pd
+
+df = pd.DataFrame(metrics)
+df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
 
 
-# In[8]:
-
-
+# -----------------------------
+# Plotting
+# -----------------------------
 import matplotlib.pyplot as plt
 
-x = list(range(1, 11))
-
-plt.plot(x, losses, marker='o', label='Training Losses')
-plt.plot(x, auc_vals, marker='s', label='AUC scores')
-
+# Loss
+plt.figure()
+plt.plot(metrics["epoch"], metrics["train_loss"], marker='o')
 plt.xlabel("Epochs")
-plt.ylabel("Values")
-plt.title("Comparison Plot for ResNet-18 with SEB blocks")
+plt.ylabel("Loss")
+plt.title("Training Loss (ResNet + SE)")
+plt.savefig(os.path.join(run_dir, "plots/loss.png"))
+plt.close()
+
+# AUC
+plt.figure()
+plt.plot(metrics["epoch"], metrics["val_auc"], marker='s')
+plt.xlabel("Epochs")
+plt.ylabel("AUC")
+plt.title("Validation AUC (ResNet + SE)")
+plt.savefig(os.path.join(run_dir, "plots/auc.png"))
+plt.close()
+
+# Accuracy & F1
+plt.figure()
+plt.plot(metrics["epoch"], metrics["val_acc"], label="Accuracy")
+plt.plot(metrics["epoch"], metrics["val_f1"], label="F1")
+plt.xlabel("Epochs")
+plt.ylabel("Score")
 plt.legend()
-
-plt.show()
-
-
-# In[9]:
+plt.title("Validation Metrics (ResNet + SE)")
+plt.savefig(os.path.join(run_dir, "plots/f1_acc.png"))
+plt.close()
 
 
-torch.save(best_model_state, "best_model12.pth")
-
-
-# In[ ]:
-
-
-with open("results.txt", "a") as f:
-    f.write("\n------------------------------\n")
-    f.write("Train results for 1.2\n")
-    f.write("------------------------------\n")
-    f.write("Losses:\n")
-    for ls in losses:
-        f.write(f"{ls}\n")
-    f.write("AUC values:\n")
-    for auc in auc_vals:
-        f.write(f"{auc}\n")
-
+print("Training complete. Best AUC:", best_auc)
+print("All outputs saved to:", run_dir)

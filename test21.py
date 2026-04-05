@@ -1,18 +1,36 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# -----------------------------
+# Run Management
+# -----------------------------
+import os
+import json
+from datetime import datetime
+
+def create_run_dir(base="runs/task2_1_test"):
+    os.makedirs(base, exist_ok=True)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(base, f"run_{run_id}")
+    os.makedirs(run_dir)
+    return run_dir
+
+run_dir = create_run_dir()
+print("Saving outputs to:", run_dir)
 
 
+# -----------------------------
+# Load Data
+# -----------------------------
 from utils import load_data
 
 test_path = "test.csv"
 test_data = load_data(test_path)
 
 
-# In[2]:
-
-
+# -----------------------------
+# Model (DeiT-3 Small)
+# -----------------------------
 import torch
 import torch.nn as nn
 import timm
@@ -30,9 +48,9 @@ model = model.to(device)
 model.eval()
 
 
-# In[3]:
-
-
+# -----------------------------
+# Inference
+# -----------------------------
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 from sklearn.preprocessing import label_binarize
 import numpy as np
@@ -54,9 +72,9 @@ with torch.no_grad():
         all_preds.append(preds.cpu().numpy())
 
 
-# In[4]:
-
-
+# -----------------------------
+# Metrics
+# -----------------------------
 all_probs = np.concatenate(all_probs)
 all_labels = np.concatenate(all_labels)
 all_preds = np.concatenate(all_preds)
@@ -72,19 +90,33 @@ y_true = label_binarize(all_labels, classes=list(range(10)))
 auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
 
-# In[5]:
-
-
+# -----------------------------
+# Print Results
+# -----------------------------
 print("\n===== Test Results (DeiT) =====")
 print(f"Accuracy  : {acc:.4f}")
 print(f"Macro F1  : {f1:.4f}")
 print(f"Macro AUC : {auc:.4f}")
 
-with open("results.txt", "a") as f:
-    f.write("\n------------------------------\n")
-    f.write("Test results for 2.1\n")
-    f.write("------------------------------\n")
-    f.write(f"Accuracy: {acc}\n")
-    f.write(f"F1 Score: {f1}\n")
-    f.write(f"Macro ROC-AUC: {auc}\n")
 
+# -----------------------------
+# Save Results
+# -----------------------------
+results = {
+    "accuracy": acc,
+    "f1_score": f1,
+    "macro_roc_auc": auc
+}
+
+with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
+    json.dump(results, f, indent=4)
+
+
+# Optional CSV
+import pandas as pd
+
+df = pd.DataFrame([results])
+df.to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
+
+
+print("Test results saved to:", run_dir)

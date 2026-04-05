@@ -1,9 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[5]:
+# -----------------------------
+# Run Management
+# -----------------------------
+import os
+import json
+from datetime import datetime
+
+def create_run_dir(base="runs/task2_1_ablation"):
+    os.makedirs(base, exist_ok=True)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(base, f"run_{run_id}")
+    os.makedirs(run_dir)
+    os.makedirs(os.path.join(run_dir, "plots"))
+    return run_dir
+
+run_dir = create_run_dir()
+print("Saving outputs to:", run_dir)
 
 
+# -----------------------------
+# Load Data
+# -----------------------------
 from utils import load_data
 
 train_path = "train.csv"
@@ -13,36 +32,31 @@ train_data = load_data(train_path)
 val_data = load_data(val_path)
 
 
-# In[6]:
-
-
+# -----------------------------
+# Model Setup
+# -----------------------------
 import torch
 import torch.nn as nn
 import timm
 
 model = timm.create_model('deit3_small_patch16_224', pretrained=True)
-
-# Replace classification head
 model.head = nn.Linear(model.head.in_features, 10)
 
 
-# In[7]:
-
-
-import torch
-import torch.nn as nn
+# -----------------------------
+# Focal Loss
+# -----------------------------
 import torch.nn.functional as F
 
 class FocalLoss(nn.Module):
     def __init__(self, gamma=2.0, alpha=None):
         super().__init__()
         self.gamma = gamma
-        self.alpha = alpha  # can be None or tensor of class weights
+        self.alpha = alpha
 
     def forward(self, logits, targets):
         ce_loss = F.cross_entropy(logits, targets, reduction='none')
-        pt = torch.exp(-ce_loss)  # probability of correct class
-
+        pt = torch.exp(-ce_loss)
         focal_loss = (1 - pt) ** self.gamma * ce_loss
 
         if self.alpha is not None:
@@ -52,174 +66,140 @@ class FocalLoss(nn.Module):
         return focal_loss.mean()
 
 
-# In[8]:
-
-
+# -----------------------------
+# Setup
+# -----------------------------
 import torch.optim as optim
 import params
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-model = model.to(device)
 
-criterion = FocalLoss()
-optimizer = optim.Adam(model.parameters(), lr=params.lr)
+# -----------------------------
+# Save Config
+# -----------------------------
+config = {
+    "experiment": "DeiT Focal Loss Ablation",
+    "gamma_values": [1, 2, 3],
+    "epochs_per_gamma": 3,
+    "lr": params.lr
+}
 
-
-# In[9]:
-
-
-outfile = open("results.txt", 'a')
-outfile.write("----------------------------\n")
-outfile.write("Ablation for task 2.1\n")
-outfile.write("---------------------\n")
-
-
-# In[11]:
+with open(os.path.join(run_dir, "config.json"), "w") as f:
+    json.dump(config, f, indent=4)
 
 
+# -----------------------------
+# Ablation Loop
+# -----------------------------
 import time
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_auc_score
-from torchvision.models import resnet18
-import torch.nn as nn
 import numpy as np
-import params 
 
 gamma_results = []
-gamma_values = [1,2,3]
+gamma_values = [1, 2, 3]
 
 for gamma in gamma_values:
-  criterion = FocalLoss(gamma=gamma)
-  outfile.write(f"Training with gamma: {gamma}\n")
+    criterion = FocalLoss(gamma=gamma)
+    print(f"\nTraining with gamma: {gamma}")
 
-  model = timm.create_model('deit3_small_patch16_224', pretrained=True)
-  model.head = nn.Linear(model.head.in_features, 10)
-  model = model.to(device)
-  optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
+    model = timm.create_model('deit3_small_patch16_224', pretrained=True)
+    model.head = nn.Linear(model.head.in_features, 10)
+    model = model.to(device)
 
+    optimizer = torch.optim.Adam(model.parameters(), lr=params.lr)
 
-  best_auc = 0
-  best_model_state = None
+    best_auc = 0
+    best_model_state = None
 
+    for epoch in range(3):
+        start = time.time()
+        model.train()
 
-  for epoch in range(3): # shorter run to judge trends
-    start = time.time()
-    model.train()
+        print(f"Running epoch: {epoch+1}")
 
-    outfile.write(f"Running epoch: {epoch+1}\n")
+        for images, labels in train_data:
+            images, labels = images.to(device), labels.to(device)
 
-    for images, labels in train_data:
-      images, labels = images.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-      optimizer.zero_grad()
-      outputs = model(images)
-      loss = criterion(outputs, labels)
-      loss.backward()
-      optimizer.step()
+        model.eval()
+        all_labels = []
+        all_probs = []
 
-    model.eval()
-    all_labels = []
-    all_probs = []
+        with torch.no_grad():
+            for images, labels in val_data:
+                images = images.to(device)
+                outputs = model(images)
+                probs = torch.softmax(outputs, dim=1)
 
-    outfile.write(f"  Evaluations for the epoch\n")
+                all_probs.append(probs.cpu().numpy())
+                all_labels.append(labels.numpy())
 
-    with torch.no_grad():
-      for images, labels in val_data:
-        images = images.to(device)
-        outputs = model(images)
-        probs = torch.softmax(outputs, dim=1)
+        all_probs = np.concatenate(all_probs)
+        all_labels = np.concatenate(all_labels)
 
-        all_probs.append(probs.cpu().numpy())
-        all_labels.append(labels.numpy())
+        y_true = label_binarize(all_labels, classes=list(range(10)))
+        auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-    all_probs = np.concatenate(all_probs)
-    all_labels = np.concatenate(all_labels)
+        print(f"Epoch {epoch+1} done, Val AUC: {auc:.4f}")
+        print(f"Time taken: {time.time()-start:.2f}s")
 
-    y_true = label_binarize(all_labels, classes=list(range(10)))
+        if auc > best_auc:
+            best_auc = auc
+            best_model_state = model.state_dict()
 
-    auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
-
-    outfile.write(f"Epoch {epoch+1} done, Val AUC: {auc:.4f}\n")
-    outfile.write(f"Time taken: {time.time()-start:.2f}s\n")
-
-    if auc > best_auc:
-      best_auc = auc
-      best_model_state = model.state_dict()
-
-    gamma_results.append(best_auc)
+        gamma_results.append(best_auc)
 
 
-# In[12]:
-
-
-outfile.close()
-
-
-# In[13]:
-
-
+# -----------------------------
+# Plot
+# -----------------------------
 import matplotlib.pyplot as plt
 
-gamma_results = gamma_results[2::3]
-plt.plot(gamma_values, gamma_results, marker='o')
+gamma_results_plot = gamma_results[2::3]
+
+plt.figure()
+plt.plot(gamma_values, gamma_results_plot, marker='o')
 plt.xlabel("Gamma")
 plt.ylabel("Best Val ROC-AUC")
-plt.title("Focal Loss Gamma Tuning")
-plt.show()
-plt.savefig("Ablation_plot21")
+plt.title("Focal Loss Gamma Tuning (DeiT)")
+plt.savefig(os.path.join(run_dir, "plots/ablation_gamma.png"))
+plt.close()
 
 
-# In[ ]:
+# -----------------------------
+# Save Ablation Results
+# -----------------------------
+import pandas as pd
+
+df = pd.DataFrame({
+    "gamma": gamma_values,
+    "best_val_auc": gamma_results_plot
+})
+
+df.to_csv(os.path.join(run_dir, "ablation_results.csv"), index=False)
 
 
-with open("results.txt", "a") as f:
-    f.write("\n------------------------------\n")
-    f.write("Ablation training results for 2.1\n")
-    f.write("------------------------------\n")
-    f.write("Values of ROC-AUC across changing gamma:\n")
-    for gr in gamma_results:
-        f.write(f"{gr}\n")
-
-
-# ------------------------
-
-# In[15]:
-
-
-from utils import load_data
-
+# -----------------------------
+# Test Best Model
+# -----------------------------
 test_path = "test.csv"
-
 test_data = load_data(test_path)
-
-
-# In[16]:
-
-
-import torch
-import torch.nn as nn
-import timm
-
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 model = timm.create_model('deit3_small_patch16_224', pretrained=False)
 model.head = nn.Linear(model.head.in_features, 10)
-
-# Load trained weights
-# state_dict = torch.load(best_model_state, map_location=device)
 model.load_state_dict(best_model_state)
 
 model = model.to(device)
 model.eval()
 
-
-# In[17]:
-
-
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
-from sklearn.preprocessing import label_binarize
-import numpy as np
 
 all_labels = []
 all_probs = []
@@ -237,38 +217,39 @@ with torch.no_grad():
         all_labels.append(labels.numpy())
         all_preds.append(preds.cpu().numpy())
 
-
-# In[18]:
-
-
 all_probs = np.concatenate(all_probs)
 all_labels = np.concatenate(all_labels)
 all_preds = np.concatenate(all_preds)
 
-# Accuracy
 acc = accuracy_score(all_labels, all_preds)
-
-# Macro F1
 f1 = f1_score(all_labels, all_preds, average='macro')
 
-# Macro AUC
 y_true = label_binarize(all_labels, classes=list(range(10)))
 auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
 
-# In[19]:
-
-
-print("\n===== Test Results (DeiT) =====")
+# -----------------------------
+# Print Results
+# -----------------------------
+print("\n===== Test Results (DeiT Ablation) =====")
 print(f"Accuracy  : {acc:.4f}")
 print(f"Macro F1  : {f1:.4f}")
 print(f"Macro AUC : {auc:.4f}")
 
-with open("results.txt", "a") as f:
-    f.write("\n------------------------------\n")
-    f.write("Ablation Test results for 2.1\n")
-    f.write("------------------------------\n")
-    f.write(f"Accuracy: {acc}\n")
-    f.write(f"F1 Score: {f1}\n")
-    f.write(f"Macro ROC-AUC: {auc}\n")
 
+# -----------------------------
+# Save Test Results
+# -----------------------------
+results = {
+    "accuracy": acc,
+    "f1_score": f1,
+    "macro_roc_auc": auc
+}
+
+with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
+    json.dump(results, f, indent=4)
+
+pd.DataFrame([results]).to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
+
+
+print("All outputs saved to:", run_dir)

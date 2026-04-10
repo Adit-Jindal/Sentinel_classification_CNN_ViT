@@ -1,5 +1,73 @@
-    #!/usr/bin/env python
-    # coding: utf-8
+#!/usr/bin/env python
+# coding: utf-8
+
+
+
+# -----------------------------
+# SE Block
+# -----------------------------
+import torch.nn as nn
+import torch
+
+class SEBlock(nn.Module):
+    def __init__(self, channels, reduction=16):
+        super().__init__()
+        self.fc1 = nn.Linear(channels, channels // reduction)
+        self.fc2 = nn.Linear(channels // reduction, channels)
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+        y = x.mean(dim=(2, 3))
+        y = torch.relu(self.fc1(y))
+        y = torch.sigmoid(self.fc2(y))
+        y = y.view(b, c, 1, 1)
+        return x * y
+
+
+# -----------------------------
+# Model
+# -----------------------------
+import torchvision.models as models
+
+class ResNet18_SE(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+
+        self.backbone = models.resnet18(pretrained=False)
+
+        state_dict = torch.load("resnet18-f37072fd.pth")
+        self.backbone.load_state_dict(state_dict)
+
+        self.se1 = SEBlock(64)
+        self.se2 = SEBlock(128)
+        self.se3 = SEBlock(256)
+        self.se4 = SEBlock(512)
+
+        self.backbone.fc = nn.Linear(self.backbone.fc.in_features, num_classes)
+
+    def forward(self, x):
+        x = self.backbone.conv1(x)
+        x = self.backbone.bn1(x)
+        x = self.backbone.relu(x)
+        x = self.backbone.maxpool(x)
+
+        x = self.backbone.layer1(x)
+        x = self.se1(x)
+
+        x = self.backbone.layer2(x)
+        x = self.se2(x)
+
+        x = self.backbone.layer3(x)
+        x = self.se3(x)
+
+        x = self.backbone.layer4(x)
+        x = self.se4(x)
+
+        x = self.backbone.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.backbone.fc(x)
+
+        return x
 
 def main():
     # -----------------------------
@@ -20,7 +88,6 @@ def main():
     run_dir = create_run_dir()
     print("Saving outputs to:", run_dir)
 
-
     # -----------------------------
     # Load Data
     # -----------------------------
@@ -31,73 +98,6 @@ def main():
 
     train_data = load_data(train_path)
     val_data = load_data(val_path)
-
-
-    # -----------------------------
-    # SE Block
-    # -----------------------------
-    import torch.nn as nn
-    import torch
-
-    class SEBlock(nn.Module):
-        def __init__(self, channels, reduction=16):
-            super().__init__()
-            self.fc1 = nn.Linear(channels, channels // reduction)
-            self.fc2 = nn.Linear(channels // reduction, channels)
-
-        def forward(self, x):
-            b, c, h, w = x.size()
-            y = x.mean(dim=(2, 3))
-            y = torch.relu(self.fc1(y))
-            y = torch.sigmoid(self.fc2(y))
-            y = y.view(b, c, 1, 1)
-            return x * y
-
-
-    # -----------------------------
-    # Model
-    # -----------------------------
-    import torchvision.models as models
-
-    class ResNet18_SE(nn.Module):
-        def __init__(self, num_classes=10):
-            super().__init__()
-
-            self.backbone = models.resnet18(pretrained=False)
-
-            state_dict = torch.load("resnet18-f37072fd.pth")
-            self.backbone.load_state_dict(state_dict)
-
-            self.se1 = SEBlock(64)
-            self.se2 = SEBlock(128)
-            self.se3 = SEBlock(256)
-            self.se4 = SEBlock(512)
-
-            self.backbone.fc = nn.Linear(self.backbone.fc.in_features, num_classes)
-
-        def forward(self, x):
-            x = self.backbone.conv1(x)
-            x = self.backbone.bn1(x)
-            x = self.backbone.relu(x)
-            x = self.backbone.maxpool(x)
-
-            x = self.backbone.layer1(x)
-            x = self.se1(x)
-
-            x = self.backbone.layer2(x)
-            x = self.se2(x)
-
-            x = self.backbone.layer3(x)
-            x = self.se3(x)
-
-            x = self.backbone.layer4(x)
-            x = self.se4(x)
-
-            x = self.backbone.avgpool(x)
-            x = torch.flatten(x, 1)
-            x = self.backbone.fc(x)
-
-            return x
 
 
     # -----------------------------

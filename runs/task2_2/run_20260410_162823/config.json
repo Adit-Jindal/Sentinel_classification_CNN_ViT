@@ -1,0 +1,6 @@
+{
+    "model": "deit3_small + DyT (no LayerNorm)",
+    "lr": 0.0001,
+    "epochs": 10,
+    "batch_size": 32
+}

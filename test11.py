@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -17,21 +11,11 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
-
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     test_path = "test.csv"
     test_data = load_data(test_path)
 
-
-    # -----------------------------
-    # Model (ResNet-18)
-    # -----------------------------
     import torchvision.models as models
     import torch.nn as nn
     import torch
@@ -41,10 +25,6 @@ def main():
     model.load_state_dict(torch.load("best_model11.pth", map_location='cpu'))
     model.eval()
 
-
-    # -----------------------------
-    # Inference
-    # -----------------------------
     all_preds = []
     all_labels = []
     all_probs = []
@@ -70,9 +50,6 @@ def main():
     all_labels = np.concatenate(all_labels)
 
 
-    # -----------------------------
-    # Metrics
-    # -----------------------------
     from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
     from sklearn.preprocessing import label_binarize
 
@@ -87,9 +64,6 @@ def main():
     print("Macro ROC-AUC: ", auc)
 
 
-    # -----------------------------
-    # Save Results
-    # -----------------------------
     results = {
         "accuracy": acc,
         "f1_score": f1,
@@ -99,8 +73,6 @@ def main():
     with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
         json.dump(results, f, indent=4)
 
-
-    # Optional CSV (for consistency with training logs)
     import pandas as pd
 
     df = pd.DataFrame([results])

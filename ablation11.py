@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -20,10 +14,6 @@ def main():
     run_dir = create_run_dir()
     print("Saving outputs to:", run_dir)
 
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     train_path = "train.csv"
@@ -33,9 +23,8 @@ def main():
     val_data = load_data(val_path)
 
 
-    # -----------------------------
-    # Download Pretrained Weights
-    # -----------------------------
+
+
     import urllib.request
     import ssl
     import certifi
@@ -53,9 +42,6 @@ def main():
     print("Downloaded weights!")
 
 
-    # -----------------------------
-    # Focal Loss
-    # -----------------------------
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
@@ -78,18 +64,12 @@ def main():
             return focal_loss.mean()
 
 
-    # -----------------------------
-    # Setup
-    # -----------------------------
     import torch.optim as optim
     import params
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
 
-    # -----------------------------
-    # Save Config
-    # -----------------------------
     config = {
         "experiment": "ResNet18 Focal Loss Ablation",
         "gamma_values": [1, 2, 3],
@@ -101,9 +81,6 @@ def main():
         json.dump(config, f, indent=4)
 
 
-    # -----------------------------
-    # Training Loop (Ablation)
-    # -----------------------------
     import time
     from sklearn.preprocessing import label_binarize
     from sklearn.metrics import roc_auc_score
@@ -171,9 +148,6 @@ def main():
             gamma_results.append(best_auc)
 
 
-    # -----------------------------
-    # Plot Ablation
-    # -----------------------------
     import matplotlib.pyplot as plt
 
     gamma_results_plot = gamma_results[2::3]
@@ -187,9 +161,7 @@ def main():
     plt.close()
 
 
-    # -----------------------------
-    # Save Ablation Metrics
-    # -----------------------------
+
     import pandas as pd
 
     df = pd.DataFrame({
@@ -200,9 +172,6 @@ def main():
     df.to_csv(os.path.join(run_dir, "ablation_results.csv"), index=False)
 
 
-    # -----------------------------
-    # Test Best Model
-    # -----------------------------
     test_path = "test.csv"
     test_data = load_data(test_path)
 
@@ -233,9 +202,6 @@ def main():
     all_labels = np.concatenate(all_labels)
 
 
-    # -----------------------------
-    # Test Metrics
-    # -----------------------------
     from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
     from sklearn.preprocessing import label_binarize
 
@@ -250,9 +216,6 @@ def main():
     print("Macro ROC-AUC:", auc)
 
 
-    # -----------------------------
-    # Save Test Results
-    # -----------------------------
     results = {
         "accuracy": acc,
         "f1_score": f1,

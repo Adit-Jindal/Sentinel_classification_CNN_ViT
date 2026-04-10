@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -18,12 +12,7 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
 
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     train_path = "train.csv"
@@ -32,10 +21,6 @@ def main():
     train_data = load_data(train_path)
     val_data = load_data(val_path)
 
-
-    # -----------------------------
-    # Download pretrained weights
-    # -----------------------------
     import urllib.request
     import ssl
     import certifi
@@ -56,9 +41,7 @@ def main():
     print("Downloaded weights!")
 
 
-    # -----------------------------
-    # Model
-    # -----------------------------
+   
     import torchvision.models as models
     import torch
 
@@ -69,9 +52,6 @@ def main():
     model.fc = torch.nn.Linear(model.fc.in_features, 10)
 
 
-    # -----------------------------
-    # Training Setup
-    # -----------------------------
     import torch.optim as optim
     import torch.nn as nn
     import params
@@ -83,9 +63,6 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
 
-    # -----------------------------
-    # Save Config
-    # -----------------------------
     from params import num_epochs
 
     config = {
@@ -99,9 +76,6 @@ def main():
         json.dump(config, f, indent=4)
 
 
-    # -----------------------------
-    # Training Loop
-    # -----------------------------
     from sklearn.metrics import roc_auc_score
     import numpy as np
     import time
@@ -161,13 +135,12 @@ def main():
 
         auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-        # Additional metrics (no change to logic)
+       
         from sklearn.metrics import accuracy_score, f1_score
         preds = np.argmax(all_probs, axis=1)
         acc = accuracy_score(all_labels, preds)
         f1 = f1_score(all_labels, preds, average='macro')
 
-        # Store metrics
         metrics["epoch"].append(epoch+1)
         metrics["train_loss"].append(train_loss)
         metrics["val_auc"].append(auc)
@@ -182,24 +155,14 @@ def main():
             best_model_state = model.state_dict()
 
 
-    # -----------------------------
-    # Save Model
-    # -----------------------------
     torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
 
-
-    # -----------------------------
-    # Save Metrics
-    # -----------------------------
     import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
 
 
-    # -----------------------------
-    # Plotting
-    # -----------------------------
     import matplotlib.pyplot as plt
 
     # Loss

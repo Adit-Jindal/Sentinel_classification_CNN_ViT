@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -17,21 +11,13 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
 
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     test_path = "test.csv"
     test_data = load_data(test_path)
 
 
-    # -----------------------------
-    # Model (DeiT-3 Small)
-    # -----------------------------
     import torch
     import torch.nn as nn
     import timm
@@ -41,7 +27,7 @@ def main():
     model = timm.create_model('deit3_small_patch16_224', pretrained=False)
     model.head = nn.Linear(model.head.in_features, 10)
 
-    # Load trained weights
+    # Load trained weights from training
     state_dict = torch.load("best_model21.pth", map_location=device)
     model.load_state_dict(state_dict)
 
@@ -49,9 +35,6 @@ def main():
     model.eval()
 
 
-    # -----------------------------
-    # Inference
-    # -----------------------------
     from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
     from sklearn.preprocessing import label_binarize
     import numpy as np
@@ -73,36 +56,23 @@ def main():
             all_preds.append(preds.cpu().numpy())
 
 
-    # -----------------------------
-    # Metrics
-    # -----------------------------
     all_probs = np.concatenate(all_probs)
     all_labels = np.concatenate(all_labels)
     all_preds = np.concatenate(all_preds)
 
-    # Accuracy
     acc = accuracy_score(all_labels, all_preds)
 
-    # Macro F1
     f1 = f1_score(all_labels, all_preds, average='macro')
 
-    # Macro AUC
     y_true = label_binarize(all_labels, classes=list(range(10)))
     auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
 
-    # -----------------------------
-    # Print Results
-    # -----------------------------
-    print("\n===== Test Results (DeiT) =====")
     print(f"Accuracy  : {acc:.4f}")
     print(f"Macro F1  : {f1:.4f}")
     print(f"Macro AUC : {auc:.4f}")
 
 
-    # -----------------------------
-    # Save Results
-    # -----------------------------
     results = {
         "accuracy": acc,
         "f1_score": f1,
@@ -113,7 +83,6 @@ def main():
         json.dump(results, f, indent=4)
 
 
-    # Optional CSV
     import pandas as pd
 
     df = pd.DataFrame([results])

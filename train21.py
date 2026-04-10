@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -18,12 +12,7 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
 
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     train_path = "train.csv"
@@ -33,9 +22,6 @@ def main():
     val_data = load_data(val_path)
 
 
-    # -----------------------------
-    # Model (DeiT-3 Small)
-    # -----------------------------
     import torch
     import torch.nn as nn
     import timm
@@ -46,9 +32,6 @@ def main():
     model.head = nn.Linear(model.head.in_features, 10)
 
 
-    # -----------------------------
-    # Training Setup
-    # -----------------------------
     import torch.optim as optim
     import params
 
@@ -59,9 +42,6 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
 
-    # -----------------------------
-    # Save Config
-    # -----------------------------
     from params import num_epochs
 
     config = {
@@ -75,9 +55,6 @@ def main():
         json.dump(config, f, indent=4)
 
 
-    # -----------------------------
-    # Training Loop
-    # -----------------------------
     from sklearn.metrics import roc_auc_score
     import numpy as np
     from sklearn.preprocessing import label_binarize
@@ -101,7 +78,6 @@ def main():
 
         print(f"Running epoch: {epoch+1}")
 
-        # ---- Training ----
         for images, labels in train_data:
             images, labels = images.to(device), labels.to(device)
 
@@ -115,7 +91,6 @@ def main():
 
         train_loss /= len(train_data)
 
-        # ---- Validation ----
         model.eval()
         all_labels = []
         all_probs = []
@@ -155,32 +130,19 @@ def main():
         print(f"Epoch {epoch+1} done, Loss: {train_loss:.4f}, AUC: {auc:.4f}, Acc: {acc:.4f}, F1: {f1:.4f}")
         print(f"Time taken: {time.time() - start:.2f}s")
 
-        # ---- Save best model ----
         if auc > best_auc:
             best_auc = auc
             best_model_state = model.state_dict()
 
-
-    # -----------------------------
-    # Save Model
-    # -----------------------------
     torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
 
-    print("Training complete. Best AUC:", best_auc)
+    print("Best AUC:", best_auc)
 
-
-    # -----------------------------
-    # Save Metrics
-    # -----------------------------
     import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
 
-
-    # -----------------------------
-    # Plotting
-    # -----------------------------
     import matplotlib.pyplot as plt
 
     # Loss

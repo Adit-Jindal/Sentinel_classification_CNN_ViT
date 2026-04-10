@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -21,9 +15,6 @@ def main():
     print("Saving outputs to:", run_dir)
 
 
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     train_path = "train.csv"
@@ -33,9 +24,7 @@ def main():
     val_data = load_data(val_path)
 
 
-    # -----------------------------
-    # Model Setup
-    # -----------------------------
+    
     import torch
     import torch.nn as nn
     import timm
@@ -43,10 +32,6 @@ def main():
     model = timm.create_model('deit3_small_patch16_224', pretrained=True)
     model.head = nn.Linear(model.head.in_features, 10)
 
-
-    # -----------------------------
-    # Focal Loss
-    # -----------------------------
     import torch.nn.functional as F
 
     class FocalLoss(nn.Module):
@@ -67,18 +52,13 @@ def main():
             return focal_loss.mean()
 
 
-    # -----------------------------
-    # Setup
-    # -----------------------------
     import torch.optim as optim
     import params
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
 
-    # -----------------------------
-    # Save Config
-    # -----------------------------
+    
     config = {
         "experiment": "DeiT Focal Loss Ablation",
         "gamma_values": [1, 2, 3],
@@ -90,9 +70,7 @@ def main():
         json.dump(config, f, indent=4)
 
 
-    # -----------------------------
-    # Ablation Loop
-    # -----------------------------
+    
     import time
     from sklearn.preprocessing import label_binarize
     from sklearn.metrics import roc_auc_score
@@ -158,9 +136,6 @@ def main():
             gamma_results.append(best_auc)
 
 
-    # -----------------------------
-    # Plot
-    # -----------------------------
     import matplotlib.pyplot as plt
 
     gamma_results_plot = gamma_results[2::3]
@@ -174,9 +149,6 @@ def main():
     plt.close()
 
 
-    # -----------------------------
-    # Save Ablation Results
-    # -----------------------------
     import pandas as pd
 
     df = pd.DataFrame({
@@ -187,9 +159,6 @@ def main():
     df.to_csv(os.path.join(run_dir, "ablation_results.csv"), index=False)
 
 
-    # -----------------------------
-    # Test Best Model
-    # -----------------------------
     test_path = "test.csv"
     test_data = load_data(test_path)
 
@@ -228,19 +197,11 @@ def main():
     y_true = label_binarize(all_labels, classes=list(range(10)))
     auc = roc_auc_score(y_true, all_probs, average='macro', multi_class='ovr')
 
-
-    # -----------------------------
-    # Print Results
-    # -----------------------------
-    print("\n===== Test Results (DeiT Ablation) =====")
     print(f"Accuracy  : {acc:.4f}")
     print(f"Macro F1  : {f1:.4f}")
     print(f"Macro AUC : {auc:.4f}")
 
 
-    # -----------------------------
-    # Save Test Results
-    # -----------------------------
     results = {
         "accuracy": acc,
         "f1_score": f1,
@@ -253,7 +214,6 @@ def main():
     pd.DataFrame([results]).to_csv(os.path.join(run_dir, "test_metrics.csv"), index=False)
 
 
-    print("All outputs saved to:", run_dir)
 
 
 if __name__=="__main__":

@@ -1,10 +1,4 @@
-    #!/usr/bin/env python
-    # coding: utf-8
-
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
     import os
     import json
     from datetime import datetime
@@ -17,21 +11,12 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
-
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     test_path = "test.csv"
     test_data = load_data(test_path)
 
 
-    # -----------------------------
-    # SE Block
-    # -----------------------------
     import torch.nn as nn
     import torch
 
@@ -44,22 +29,17 @@ def main():
         def forward(self, x):
             b, c, h, w = x.size()
 
-            # Squeeze
             y = x.mean(dim=(2, 3))
 
-            # Excitation
             y = torch.relu(self.fc1(y))
             y = torch.sigmoid(self.fc2(y))
 
             y = y.view(b, c, 1, 1)
 
-            # Scale
             return x * y
 
 
-    # -----------------------------
-    # Model (ResNet-18 + SE)
-    # -----------------------------
+
     import torchvision.models as models
 
     class ResNet18_SE(nn.Module):
@@ -68,13 +48,11 @@ def main():
 
             self.backbone = models.resnet18(weights=None)
 
-            # SE blocks
             self.se1 = SEBlock(64)
             self.se2 = SEBlock(128)
             self.se3 = SEBlock(256)
             self.se4 = SEBlock(512)
 
-            # replace fc
             self.backbone.fc = nn.Linear(self.backbone.fc.in_features, num_classes)
 
         def forward(self, x):
@@ -101,18 +79,10 @@ def main():
 
             return x
 
-
-    # -----------------------------
-    # Load Model Weights
-    # -----------------------------
     model = ResNet18_SE(num_classes=10)
     state_dict = torch.load("best_model12.pth", map_location='cpu')
     model.load_state_dict(state_dict)
 
-
-    # -----------------------------
-    # Inference
-    # -----------------------------
     all_preds = []
     all_labels = []
     all_probs = []
@@ -139,9 +109,6 @@ def main():
     all_labels = np.concatenate(all_labels)
 
 
-    # -----------------------------
-    # Metrics
-    # -----------------------------
     from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
     from sklearn.preprocessing import label_binarize
 
@@ -154,11 +121,6 @@ def main():
     print("Accuracy: ", acc)
     print("F1 Score: ", f1)
     print("Macro ROC-AUC: ", auc)
-
-
-    # -----------------------------
-    # Save Results
-    # -----------------------------
     results = {
         "accuracy": acc,
         "f1_score": f1,
@@ -168,8 +130,6 @@ def main():
     with open(os.path.join(run_dir, "test_metrics.json"), "w") as f:
         json.dump(results, f, indent=4)
 
-
-    # Optional CSV (for consistency)
     import pandas as pd
 
     df = pd.DataFrame([results])
@@ -177,7 +137,6 @@ def main():
 
 
     print("Test results saved to:", run_dir)
-
 
 if __name__=="__main__":
     main()

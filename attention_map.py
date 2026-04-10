@@ -1,9 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# =============================
-# CONFIG (EDIT THESE)
-# =============================
 MODEL_PATH = "best_model21.pth"
 TEST_CSV = "test.csv"
 
@@ -19,20 +14,13 @@ def create_run_dir(base="runs/attention"):
 
 OUTPUT_DIR = create_run_dir()
 
-# =============================
-# IMPORTS
-# =============================
 import torch
 import torch.nn as nn
 import numpy as np
 import cv2
 import timm
-
 from utils import load_data
 
-# =============================
-# ATTENTION HOOK
-# =============================
 class AttentionExtractor:
     def __init__(self, model):
         self.model = model
@@ -43,8 +31,6 @@ class AttentionExtractor:
         blk.attn.register_forward_hook(self.get_attention)
 
     def get_attention(self, module, input, output):
-        # Extract attention weights manually
-        # input[0] = x → [B, N, C]
         x = input[0]
 
         B, N, C = x.shape
@@ -62,19 +48,14 @@ class AttentionExtractor:
     def clear(self):
         self.attentions = []
 
-# =============================
-# ATTENTION ROLLOUT
-# =============================
 def compute_rollout(attentions):
     result = None
 
     for attn in attentions:
-        attn = attn.mean(dim=1)  # [B, N, N]
+        attn = attn.mean(dim=1)  
 
-        eye = torch.eye(attn.size(-1)).to(attn.device)
-        eye = eye.unsqueeze(0).expand(attn.size(0), -1, -1)
-
-        attn = attn + eye
+        I = torch.eye(attn.size(-1)).to(attn.device)
+        attn = attn + I
         attn = attn / attn.sum(dim=-1, keepdim=True)
 
         if result is None:
@@ -84,10 +65,6 @@ def compute_rollout(attentions):
 
     return result
 
-
-# =============================
-# UTILS
-# =============================
 def tensor_to_image(tensor):
     img = tensor.squeeze().permute(1, 2, 0).cpu().numpy()
     img = (img - img.min()) / (img.max() + 1e-8)
@@ -102,13 +79,10 @@ def overlay(image, attn_map):
     return overlay.astype(np.uint8)
 
 
-# =============================
-# MAIN
-# =============================
+
 def main():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load model
     model = timm.create_model('deit3_small_patch16_224', pretrained=False)
     model.head = nn.Linear(model.head.in_features, 10)
 
@@ -117,13 +91,10 @@ def main():
     model.to(device)
     model.eval()
 
-    # Attach attention extractor
     extractor = AttentionExtractor(model)
 
-    # Load data
     test_data = load_data(TEST_CSV)
 
-    # Pick one image per class
     class_samples = {}
     for images, labels in test_data:
         for i in range(len(labels)):
@@ -135,38 +106,29 @@ def main():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Process each class
     for cls, img in class_samples.items():
         print(f"Processing class {cls}")
 
         extractor.clear()
 
         img = img.to(device)
-        # Forward pass (collect attention)
         _ = model(img)
 
-        # Compute rollout
         attn = compute_rollout(extractor.attentions)
 
-        # Extract CLS attention
-        attn_map = attn[:, 0, 1:]  # CLS → patches
+        attn_map = attn[:, 0, 1:]
 
-        # Reshape to grid
         num_patches = attn_map.shape[-1]
-        grid_size = int(np.sqrt(num_patches))  # should be 14 for 224/16
+        grid_size = int(np.sqrt(num_patches))  
 
         attn_map = attn_map.reshape(grid_size, grid_size).detach().cpu().numpy()
 
-        # Normalize
         attn_map = (attn_map - attn_map.min()) / (attn_map.max() + 1e-8)
 
-        # Convert image
         img_np = tensor_to_image(img)
 
-        # Overlay
         overlay_img = overlay(img_np, attn_map)
 
-        # Save
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"class_{cls}_original.png"), img_np)
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"class_{cls}_attention.png"), overlay_img)
 

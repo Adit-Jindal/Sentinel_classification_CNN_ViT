@@ -1,11 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-
-
-# -----------------------------
-# SE Block
-# -----------------------------
 import torch.nn as nn
 import torch
 
@@ -24,9 +16,6 @@ class SEBlock(nn.Module):
         return x * y
 
 
-# -----------------------------
-# Model
-# -----------------------------
 import torchvision.models as models
 
 class ResNet18_SE(nn.Module):
@@ -70,9 +59,7 @@ class ResNet18_SE(nn.Module):
         return x
 
 def main():
-    # -----------------------------
-    # Run Management
-    # -----------------------------
+    
     import os
     import json
     from datetime import datetime
@@ -86,11 +73,6 @@ def main():
         return run_dir
 
     run_dir = create_run_dir()
-    print("Saving outputs to:", run_dir)
-
-    # -----------------------------
-    # Load Data
-    # -----------------------------
     from utils import load_data
 
     train_path = "train.csv"
@@ -100,9 +82,7 @@ def main():
     val_data = load_data(val_path)
 
 
-    # -----------------------------
-    # Download pretrained weights
-    # -----------------------------
+   
     import urllib.request
     import ssl
     import certifi
@@ -123,9 +103,6 @@ def main():
     print("Downloaded weights!")
 
 
-    # -----------------------------
-    # Training Setup
-    # -----------------------------
     import torch.optim as optim
     import params
 
@@ -138,9 +115,6 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
 
-    # -----------------------------
-    # Save Config
-    # -----------------------------
     from params import num_epochs
 
     config = {
@@ -154,9 +128,6 @@ def main():
         json.dump(config, f, indent=4)
 
 
-    # -----------------------------
-    # Training Loop
-    # -----------------------------
     import time
     import numpy as np
     from sklearn.metrics import roc_auc_score
@@ -236,24 +207,13 @@ def main():
             best_model_state = model.state_dict()
 
 
-    # -----------------------------
-    # Save Model
-    # -----------------------------
     torch.save(best_model_state, os.path.join(run_dir, "best_model.pth"))
 
-
-    # -----------------------------
-    # Save Metrics
-    # -----------------------------
     import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.to_csv(os.path.join(run_dir, "metrics.csv"), index=False)
 
-
-    # -----------------------------
-    # Plotting
-    # -----------------------------
     import matplotlib.pyplot as plt
 
     # Loss

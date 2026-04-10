@@ -1,32 +1,20 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# =============================
-# CONFIG (EDIT THESE)
-# =============================
 MODEL_11_PATH = "best_model11.pth"
 MODEL_12_PATH = "best_model12.pth"
-
 TEST_CSV = "test.csv"
-
 SE_MODEL_IMPORT = "train12"
 
-# =============================
-# IMPORTS
-# =============================
 import os
 import torch
 import torch.nn as nn
 import torchvision.models as models
 import numpy as np
 import cv2
-
 from utils import load_data
 
-# Dynamic import for SE model
 import importlib
 se_module = importlib.import_module(SE_MODEL_IMPORT)
 ResNet18_SE = getattr(se_module, "ResNet18_SE")
+
 
 from datetime import datetime
 
@@ -39,9 +27,6 @@ def create_run_dir(base="runs/gradcam"):
 
 OUTPUT_DIR = create_run_dir()
 
-# =============================
-# Grad-CAM CLASS
-# =============================
 class GradCAM:
     def __init__(self, model, target_layer):
         self.model = model
@@ -82,10 +67,6 @@ class GradCAM:
 
         return cam
 
-
-# =============================
-# UTILS
-# =============================
 def overlay(image, cam):
     cam = cv2.resize(cam, (image.shape[1], image.shape[0]))
     heatmap = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
@@ -99,10 +80,6 @@ def tensor_to_image(tensor):
     img = (img * 255).astype(np.uint8)
     return img
 
-
-# =============================
-# MODEL LOADERS
-# =============================
 def load_resnet18(path, device):
     model = models.resnet18()
     model.fc = nn.Linear(model.fc.in_features, 10)
@@ -119,25 +96,16 @@ def load_resnet18_se(path, device):
     model.eval()
     return model
 
-
-# =============================
-# MAIN
-# =============================
 def main():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-
-    # Load data
     test_data = load_data(TEST_CSV)
 
-    # Load models
     model_11 = load_resnet18(MODEL_11_PATH, device)
     model_12 = load_resnet18_se(MODEL_12_PATH, device)
 
-    # Grad-CAM instances
     cam_11 = GradCAM(model_11, model_11.layer4[-1])
     cam_12 = GradCAM(model_12, model_12.backbone.layer4[-1])
 
-    # Select one image per class
     class_samples = {}
 
     for images, labels in test_data:
@@ -148,10 +116,8 @@ def main():
         if len(class_samples) == 10:
             break
 
-    # Output directory
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Generate Grad-CAMs
     for cls, img in class_samples.items():
         print(f"Processing class {cls}")
 
@@ -165,7 +131,6 @@ def main():
         overlay1 = overlay(img_np, cam1)
         overlay2 = overlay(img_np, cam2)
 
-        # Save images
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"class_{cls}_original.png"), img_np)
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"class_{cls}_resnet.png"), overlay1)
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"class_{cls}_se.png"), overlay2)

@@ -36,7 +36,7 @@ def main():
     import torch.nn as nn
     import timm
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
     model = timm.create_model('deit3_small_patch16_224', pretrained=False)
     model.head = nn.Linear(model.head.in_features, 10)

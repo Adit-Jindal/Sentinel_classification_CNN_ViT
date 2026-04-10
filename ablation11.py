@@ -84,7 +84,7 @@ def main():
     import torch.optim as optim
     import params
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
 
     # -----------------------------

@@ -8,57 +8,57 @@ echo "Running mode: $MODE"
 # TRAIN
 # -----------------------------
 run_all_train() {
-    python train11.py
-    python train12.py
-    python train21.py
-    python train22.py
+    time python train11.py
+    time python train12.py
+    time python train21.py
+    time python train22.py
 }
 
 # -----------------------------
 # TEST
 # -----------------------------
 run_all_test() {
-    python test11.py
-    python test12.py
-    python test21.py
-    python test22.py
+    time python test11.py
+    time python test12.py
+    time python test21.py
+    time python test22.py
 }
 
 # -----------------------------
 # ABLATION
 # -----------------------------
 run_all_ablation() {
-    python ablation11.py
-    python ablation12.py
-    python ablation21.py
-    python ablation22.py
+    time python ablation11.py
+    time python ablation12.py
+    time python ablation21.py
+    time python ablation22.py
 }
 
 # -----------------------------
 # PER TASK BLOCKS
 # -----------------------------
 run11() {
-    python train11.py
-    python test11.py
-    python ablation11.py
+    time python train11.py
+    time python test11.py
+    time python ablation11.py
 }
 
 run12() {
-    python train12.py
-    python test12.py
-    python ablation12.py
+    time python train12.py
+    time python test12.py
+    time python ablation12.py
 }
 
 run21() {
-    python train21.py
-    python test21.py
-    python ablation21.py
+    time python train21.py
+    time python test21.py
+    time python ablation21.py
 }
 
 run22() {
-    python train22.py
-    python test22.py
-    python ablation22.py
+    time python train22.py
+    time python test22.py
+    time python ablation22.py
 }
 
 # -----------------------------
